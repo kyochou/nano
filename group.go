@@ -124,7 +124,9 @@ func (c *Group) Broadcast(route string, v interface{}) error {
 	}
 
 	if env.debug {
-		logger.Println(fmt.Sprintf("Type=Broadcast Route=%s, Data=%+v", route, v))
+		if _, ok := env.debugIgnoreRoutes[route]; !ok {
+			logger.Println(fmt.Sprintf("Type=Broadcast Route=%s, Data=%+v", route, v))
+		}
 	}
 
 	c.mu.RLock()

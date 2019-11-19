@@ -41,12 +41,13 @@ var (
 	// env represents the environment of the current process, includes
 	// work path and config path etc.
 	env = &struct {
-		wd          string                   // working path
-		die         chan bool                // wait for end application
-		heartbeat   time.Duration            // heartbeat internal
-		checkOrigin func(*http.Request) bool // check origin when websocket enabled
-		debug       bool                     // enable debug
-		wsPath      string                   // WebSocket path(eg: ws://127.0.0.1/wsPath)
+		wd                string                   // working path
+		die               chan bool                // wait for end application
+		heartbeat         time.Duration            // heartbeat internal
+		checkOrigin       func(*http.Request) bool // check origin when websocket enabled
+		debug             bool                     // enable debug
+		wsPath            string                   // WebSocket path(eg: ws://127.0.0.1/wsPath)
+		debugIgnoreRoutes map[string]struct{}
 	}{}
 )
 
@@ -67,4 +68,5 @@ func init() {
 	env.heartbeat = 30 * time.Second
 	env.debug = false
 	env.checkOrigin = func(_ *http.Request) bool { return true }
+	env.debugIgnoreRoutes = make(map[string]struct{}, 0)
 }

@@ -74,6 +74,12 @@ func EnableDebug() {
 	env.debug = true
 }
 
+func SetDebugIgnoreRoute(routes []string) {
+	for _, r := range routes {
+		env.debugIgnoreRoutes[r] = struct{}{}
+	}
+}
+
 // SetDictionary set routes map, TODO(warning): set dictionary in runtime would be a dangerous operation!!!!!!
 func SetDictionary(dict map[string]uint16) {
 	message.SetDictionary(dict)
