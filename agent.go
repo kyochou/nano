@@ -116,13 +116,15 @@ func (a *agent) Push(route string, v interface{}) error {
 	}
 
 	if env.debug {
-		switch d := v.(type) {
-		case []byte:
-			logger.Println(fmt.Sprintf("Type=Push, ID=%d, UID=%d, Route=%s, Data=%dbytes",
-				a.session.ID(), a.session.UID(), route, len(d)))
-		default:
-			logger.Println(fmt.Sprintf("Type=Push, ID=%d, UID=%d, Route=%s, Data=%+v",
-				a.session.ID(), a.session.UID(), route, v))
+		if _, ok := env.debugIgnoreRoutes[route]; !ok {
+			switch d := v.(type) {
+			case []byte:
+				logger.Println(fmt.Sprintf("Type=Push, ID=%d, UID=%d, Route=%s, Data=%dbytes",
+					a.session.ID(), a.session.UID(), route, len(d)))
+			default:
+				logger.Println(fmt.Sprintf("Type=Push, ID=%d, UID=%d, Route=%s, Data=%+v",
+					a.session.ID(), a.session.UID(), route, v))
+			}
 		}
 	}
 
