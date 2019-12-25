@@ -27,3 +27,10 @@ const (
 	statusWorking
 	statusClosed
 )
+
+type key int
+
+const (
+	_ key = iota
+	CTXJaegerSpan
+)

@@ -21,6 +21,7 @@
 package packet
 
 import (
+	"context"
 	"errors"
 	"fmt"
 )
@@ -44,6 +45,9 @@ const (
 
 	// Kick represents a kick off packet
 	Kick = 0x05 // disconnect message from server
+
+	// TraceData 带有 trace 信息的 Data
+	TraceData = 0x06
 )
 
 // ErrWrongPacketType represents a wrong packet type.
@@ -51,14 +55,17 @@ var ErrWrongPacketType = errors.New("wrong packet type")
 
 // Packet represents a network packet.
 type Packet struct {
-	Type   Type
-	Length int
-	Data   []byte
+	Type    Type
+	Length  int
+	Data    []byte
+	Context context.Context
 }
 
 //New create a Packet instance.
 func New() *Packet {
-	return &Packet{}
+	return &Packet{
+		Context: context.Background(),
+	}
 }
 
 //String represents the Packet's in text mode.

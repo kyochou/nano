@@ -43,6 +43,9 @@ type NetworkEntity interface {
 var (
 	//ErrIllegalUID represents a invalid uid
 	ErrIllegalUID = errors.New("illegal uid")
+
+	// session keys
+	SKOpenTraces = `n_opentracing_traces`
 )
 
 // Session represents a client session which could storage temp data during low-level

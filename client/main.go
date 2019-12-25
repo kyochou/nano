@@ -1,8 +1,12 @@
 package client
 
 import (
+	"bytes"
+	"encoding/binary"
 	"encoding/json"
+	"fmt"
 	"log"
+	"net"
 	"sync"
 	"time"
 
@@ -11,6 +15,8 @@ import (
 	"github.com/lonng/nano/internal/codec"
 	"github.com/lonng/nano/internal/message"
 	"github.com/lonng/nano/internal/packet"
+	"github.com/lonng/nano/tracing"
+	opentracing "github.com/opentracing/opentracing-go"
 )
 
 var (
@@ -46,6 +52,7 @@ type (
 	// Connector is a tiny Nano client
 	Connector struct {
 		conn        *websocket.Conn // low-level connection
+		tcpConn     *net.TCPConn    // low-level connection
 		codec       *codec.Decoder  // decoder
 		die         chan struct{}   // connector close channel
 		chSend      chan []byte     // send queue
@@ -61,6 +68,8 @@ type (
 		responses   map[uint]Callback
 
 		connectedCallback func() // connected callback
+		opentraces        tracing.SmStrSpan
+		Name              string
 	}
 )
 
@@ -83,8 +92,14 @@ func (c *Connector) Start(addr string) error {
 	if err != nil {
 		log.Fatal("dial:", err)
 	}
-
 	c.conn = wsConn
+
+	tcpConn, ok := wsConn.UnderlyingConn().(*net.TCPConn)
+	if ok {
+		c.tcpConn = tcpConn
+	} else {
+		log.Fatal(`UnderlyingConn assert TCPConn error`)
+	}
 
 	go c.write()
 
@@ -125,20 +140,50 @@ func (c *Connector) Request(route string, v proto.Message, callback Callback) er
 	return nil
 }
 
+func (c *Connector) getNotifyMessage(route string, v proto.Message) (*message.Message, error) {
+	data, err := serialize(v)
+	if err != nil {
+		return nil, err
+	}
+
+	return &message.Message{
+		Type:  message.Notify,
+		Route: route,
+		Data:  data,
+	}, nil
+}
+
 // Notify send a notification to server
 func (c *Connector) Notify(route string, v proto.Message) error {
-	data, err := serialize(v)
+	msg, err := c.getNotifyMessage(route, v)
 	if err != nil {
 		return err
 	}
 
-	msg := &message.Message{
-		Type:  message.Notify,
-		Route: route,
-		Data:  data,
-	}
 	// log.Printf("send %v", msg)
 	return c.sendMessage(msg)
+}
+
+func (c *Connector) TraceNotify(route string, v proto.Message, finishRoute string) error {
+	msg, err := c.getNotifyMessage(route, v)
+	if err != nil {
+		return err
+	}
+
+	span := opentracing.GlobalTracer().StartSpan(fmt.Sprintf("%s => %s", route, finishRoute))
+	c.opentraces.Store(finishRoute, span)
+
+	b := bytes.NewBuffer([]byte{})
+	span.Tracer().Inject(span.Context(), opentracing.Binary, b)
+	ctx := b.Bytes()
+
+	buf := make([]byte, 64)
+	copy(buf[0:], []byte(finishRoute))
+	b2 := make([]byte, 4)
+	binary.LittleEndian.PutUint32(b2, uint32(len(ctx)))
+	d := append(buf, b2...)
+	d = append(d, ctx...)
+	return c.sendTypedMessage(msg, packet.TraceData, d)
 }
 
 // On add the callback for the event
@@ -151,10 +196,6 @@ func (c *Connector) On(event string, callback Callback) {
 
 // Close close the connection, and shutdown the benchmark
 func (c *Connector) Close() {
-	defer func() {
-		// ignore panic
-		recover()
-	}()
 	c.heartTicker.Stop()
 	close(c.die)
 	c.conn.Close()
@@ -187,15 +228,16 @@ func (c *Connector) setResponseHandler(mid uint, cb Callback) {
 	}
 }
 
-func (c *Connector) sendMessage(msg *message.Message) error {
+func (c *Connector) sendTypedMessage(msg *message.Message, typ packet.Type, extra []byte) error {
 	data, err := msg.Encode()
 	if err != nil {
 		return err
 	}
 
-	//log.Printf("%+v",msg)
-
-	payload, err := codec.Encode(packet.Data, data)
+	if len(extra) > 0 {
+		data = append(extra, data...)
+	}
+	payload, err := codec.Encode(typ, data)
 	if err != nil {
 		return err
 	}
@@ -204,6 +246,10 @@ func (c *Connector) sendMessage(msg *message.Message) error {
 	c.send(payload)
 
 	return nil
+}
+
+func (c *Connector) sendMessage(msg *message.Message) error {
+	return c.sendTypedMessage(msg, packet.Data, nil)
 }
 
 func (c *Connector) write() {
@@ -225,6 +271,7 @@ func (c *Connector) write() {
 }
 
 func (c *Connector) send(data []byte) {
+	// c.tcpConn.SetNoDelay(true)
 	c.chSend <- data
 }
 
@@ -289,15 +336,18 @@ func (c *Connector) processPacket(p *packet.Packet) {
 }
 
 func (c *Connector) processMessage(msg *message.Message) {
+	// log.Printf("on %v", msg)
 	switch msg.Type {
 	case message.Push:
-		// log.Printf("on %v", msg)
 		cb, ok := c.eventHandler(msg.Route)
 		if !ok {
 			// log.Println("event handler not found", msg.Route)
 			return
 		}
-
+		// log.Printf("on %v", msg)
+		if opspan, ok := c.opentraces.Load(msg.Route); ok {
+			opspan.Finish()
+		}
 		cb(msg.Data)
 
 	case message.Response:
@@ -306,7 +356,7 @@ func (c *Connector) processMessage(msg *message.Message) {
 			// log.Println("response handler not found", msg.ID)
 			return
 		}
-
+		// log.Printf("on %v", msg)
 		cb(msg.Data)
 		c.setResponseHandler(msg.ID, nil)
 	}

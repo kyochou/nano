@@ -32,6 +32,7 @@ import (
 	"github.com/lonng/nano/internal/message"
 	"github.com/lonng/nano/internal/packet"
 	"github.com/lonng/nano/session"
+	"github.com/lonng/nano/tracing"
 )
 
 const (
@@ -124,6 +125,17 @@ func (a *agent) Push(route string, v interface{}) error {
 			default:
 				logger.Println(fmt.Sprintf("Type=Push, ID=%d, UID=%d, Route=%s, Data=%+v",
 					a.session.ID(), a.session.UID(), route, v))
+			}
+		}
+	}
+
+	if a.session.HasKey(session.SKOpenTraces) {
+		if ts, ok := a.session.Value(session.SKOpenTraces).(*tracing.SmStrSpan); ok {
+			if sp, ok := ts.Load(route); ok {
+				sp.Finish()
+				if env.debug {
+					logger.Println(fmt.Sprintf("Trace finish span: %s, %+v", route, sp))
+				}
 			}
 		}
 	}

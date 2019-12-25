@@ -21,6 +21,9 @@
 package nano
 
 import (
+	"bytes"
+	"context"
+	"encoding/binary"
 	"encoding/json"
 	"fmt"
 	"net"
@@ -33,6 +36,9 @@ import (
 	"github.com/lonng/nano/internal/message"
 	"github.com/lonng/nano/internal/packet"
 	"github.com/lonng/nano/session"
+	"github.com/lonng/nano/tracing"
+
+	opentracing "github.com/opentracing/opentracing-go"
 )
 
 // Unhandled message buffer size
@@ -275,6 +281,32 @@ func (h *handlerService) processPacket(agent *agent, p *packet.Packet) error {
 
 	case packet.Heartbeat:
 		// expected
+	case packet.TraceData:
+		data := p.Data
+		tname := data[0:64]
+		tlen := data[64:68]
+		tdl := binary.LittleEndian.Uint32(tlen)
+		rtn := string(bytes.Trim(tname, "\x00"))
+
+		sctx, err := opentracing.GlobalTracer().Extract(opentracing.Binary, bytes.NewReader(data[68:68+tdl]))
+		if err != nil {
+			panic(err)
+		}
+		if env.debug {
+			logger.Println(fmt.Sprintf("Trace start span: %s", rtn))
+		}
+
+		child := opentracing.GlobalTracer().StartSpan(`nano`, opentracing.ChildOf(sctx))
+		if !agent.session.HasKey(session.SKOpenTraces) {
+			agent.session.Set(session.SKOpenTraces, new(tracing.SmStrSpan))
+		}
+		smSpan, _ := agent.session.Value(session.SKOpenTraces).(*tracing.SmStrSpan)
+		smSpan.LoadOrStore(rtn, child)
+
+		p.Context = context.WithValue(p.Context, CTXJaegerSpan, child.Context())
+		p.Data = data[68+tdl:]
+		p.Type = packet.Data
+		h.processPacket(agent, p)
 	}
 
 	atomic.StoreInt64(&agent.lastAt, time.Now().Unix())

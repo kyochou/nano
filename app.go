@@ -28,19 +28,29 @@ import (
 	"os/signal"
 	"syscall"
 
-	"github.com/gorilla/websocket"
 	"strings"
-	"time"
 	"sync/atomic"
+	"time"
+
+	"github.com/gorilla/websocket"
+	"github.com/lonng/nano/tracing"
 )
 
 var running int32
 
 func listen(addr string, isWs bool, opts ...Option) {
-	listenTLS(addr, isWs, "", "", opts...);
+	listenTLS(addr, isWs, "", "", opts...)
 }
 
 func listenTLS(addr string, isWs bool, certificate string, key string, opts ...Option) {
+	// start tracing
+	otCloser, otErr := tracing.InitTracing(`game-server`, opentracingLogger)
+	if otErr != nil {
+		logger.Fatal(otErr)
+	} else {
+		defer otCloser.Close()
+	}
+
 	// mark application running
 	if atomic.AddInt32(&running, 1) != 1 {
 		logger.Println("Nano has running")
