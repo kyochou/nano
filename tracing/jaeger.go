@@ -13,10 +13,8 @@ import (
 	jaegercfg "github.com/uber/jaeger-client-go/config"
 )
 
-const _jaegerAddr = `192.168.199.82:6831`
-
-func InitTracing(name string, logger jaeger.Logger) (closer io.Closer, err error) {
-	tracer, closer, err := NewJaegerTracer(name, logger)
+func InitTracing(name string, agentAddr string, logger jaeger.Logger) (closer io.Closer, err error) {
+	tracer, closer, err := NewJaegerTracer(name, agentAddr, logger)
 	if err != nil {
 		return nil, err
 	}
@@ -24,7 +22,7 @@ func InitTracing(name string, logger jaeger.Logger) (closer io.Closer, err error
 	return closer, err
 }
 
-func NewJaegerTracer(serviceName string, jLogger jaeger.Logger) (tracer opentracing.Tracer, closer io.Closer, err error) {
+func NewJaegerTracer(serviceName string, agentAddr string, jLogger jaeger.Logger) (tracer opentracing.Tracer, closer io.Closer, err error) {
 	cfg := jaegercfg.Configuration{
 		ServiceName: serviceName,
 		Sampler: &jaegercfg.SamplerConfig{
@@ -34,7 +32,7 @@ func NewJaegerTracer(serviceName string, jLogger jaeger.Logger) (tracer opentrac
 		Reporter: &jaegercfg.ReporterConfig{
 			LogSpans:            true,
 			BufferFlushInterval: 1 * time.Second,
-			LocalAgentHostPort:  _jaegerAddr,
+			LocalAgentHostPort:  agentAddr,
 		},
 	}
 	// frameworks.

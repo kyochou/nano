@@ -132,6 +132,10 @@ func (a *agent) Push(route string, v interface{}) error {
 	if a.session.HasKey(session.SKOpenTraces) {
 		if ts, ok := a.session.Value(session.SKOpenTraces).(*tracing.SmStrSpan); ok {
 			if sp, ok := ts.Load(route); ok {
+				sp.SetTag(`SID`, a.session.ID())
+				sp.SetTag(`UID`, a.session.UID())
+				sp.SetTag(`push-route`, route)
+				sp.SetTag(`push-content`, v)
 				sp.Finish()
 				if env.debug {
 					logger.Println(fmt.Sprintf("Trace finish span: %s, %+v", route, sp))

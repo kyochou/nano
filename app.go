@@ -43,12 +43,14 @@ func listen(addr string, isWs bool, opts ...Option) {
 }
 
 func listenTLS(addr string, isWs bool, certificate string, key string, opts ...Option) {
-	// start tracing
-	otCloser, otErr := tracing.InitTracing(`game-server`, opentracingLogger)
-	if otErr != nil {
-		logger.Fatal(otErr)
-	} else {
-		defer otCloser.Close()
+	if jaegerAgentAddr != `` {
+		// start tracing
+		otCloser, otErr := tracing.InitTracing(`game-server`, jaegerAgentAddr, opentracingLogger)
+		if otErr != nil {
+			logger.Fatal(otErr)
+		} else {
+			defer otCloser.Close()
+		}
 	}
 
 	// mark application running

@@ -21,6 +21,7 @@
 package component
 
 import (
+	"context"
 	"reflect"
 	"unicode"
 	"unicode/utf8"
@@ -32,6 +33,7 @@ var (
 	typeOfError   = reflect.TypeOf((*error)(nil)).Elem()
 	typeOfBytes   = reflect.TypeOf(([]byte)(nil))
 	typeOfSession = reflect.TypeOf(session.New(nil))
+	typeOfContext = reflect.TypeOf((*context.Context)(nil)).Elem()
 )
 
 func isExported(name string) bool {
@@ -56,8 +58,8 @@ func isHandlerMethod(method reflect.Method) bool {
 		return false
 	}
 
-	// Method needs three ins: receiver, *Session, []byte or pointer.
-	if mt.NumIn() != 3 {
+	// Method needs four ins: receiver, context.Context, *Session, []byte or pointer.
+	if mt.NumIn() != 4 {
 		return false
 	}
 
@@ -66,11 +68,15 @@ func isHandlerMethod(method reflect.Method) bool {
 		return false
 	}
 
-	if t1 := mt.In(1); t1.Kind() != reflect.Ptr || t1 != typeOfSession {
+	if t1 := mt.In(1); t1.Kind() != reflect.Interface || t1 != typeOfContext {
 		return false
 	}
 
-	if (mt.In(2).Kind() != reflect.Ptr && mt.In(2) != typeOfBytes) || mt.Out(0) != typeOfError {
+	if t2 := mt.In(2); t2.Kind() != reflect.Ptr || t2 != typeOfSession {
+		return false
+	}
+
+	if (mt.In(3).Kind() != reflect.Ptr && mt.In(3) != typeOfBytes) || mt.Out(0) != typeOfError {
 		return false
 	}
 	return true

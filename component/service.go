@@ -75,14 +75,14 @@ func (s *Service) suitableHandlerMethods(typ reflect.Type) map[string]*Handler {
 		mn := method.Name
 		if isHandlerMethod(method) {
 			raw := false
-			if mt.In(2) == typeOfBytes {
+			if mt.In(3) == typeOfBytes {
 				raw = true
 			}
 			// rewrite handler name
 			if s.Options.nameFunc != nil {
 				mn = s.Options.nameFunc(mn)
 			}
-			methods[mn] = &Handler{Method: method, Type: mt.In(2), IsRawArg: raw}
+			methods[mn] = &Handler{Method: method, Type: mt.In(3), IsRawArg: raw}
 		}
 	}
 	return methods

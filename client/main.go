@@ -171,6 +171,8 @@ func (c *Connector) TraceNotify(route string, v proto.Message, finishRoute strin
 	}
 
 	span := opentracing.GlobalTracer().StartSpan(fmt.Sprintf("%s => %s", route, finishRoute))
+	span.SetTag(`req-route`, route)
+	span.SetTag(`req-content`, v)
 	c.opentraces.Store(finishRoute, span)
 
 	b := bytes.NewBuffer([]byte{})

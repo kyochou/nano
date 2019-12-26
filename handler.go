@@ -277,7 +277,7 @@ func (h *handlerService) processPacket(agent *agent, p *packet.Packet) error {
 		if err != nil {
 			return err
 		}
-		h.processMessage(agent, msg)
+		h.processMessage(p.Context, agent, msg)
 
 	case packet.Heartbeat:
 		// expected
@@ -313,7 +313,7 @@ func (h *handlerService) processPacket(agent *agent, p *packet.Packet) error {
 	return nil
 }
 
-func (h *handlerService) processMessage(agent *agent, msg *message.Message) {
+func (h *handlerService) processMessage(ctx context.Context, agent *agent, msg *message.Message) {
 	var lastMid uint
 	switch msg.Type {
 	case message.Request:
@@ -353,7 +353,7 @@ func (h *handlerService) processMessage(agent *agent, msg *message.Message) {
 		logger.Println(fmt.Sprintf("UID=%d, Message={%s}, Data=%+v", agent.session.UID(), msg.String(), data))
 	}
 
-	args := []reflect.Value{handler.Receiver, agent.srv, reflect.ValueOf(data)}
+	args := []reflect.Value{handler.Receiver, reflect.ValueOf(ctx), agent.srv, reflect.ValueOf(data)}
 	h.chLocalProcess <- unhandledMessage{agent, lastMid, handler.Method, args}
 }
 

@@ -22,6 +22,7 @@ package codec
 
 import (
 	"bytes"
+	"context"
 	"errors"
 
 	"github.com/lonng/nano/internal/packet"
@@ -88,7 +89,7 @@ func (c *Decoder) Decode(data []byte) ([]*packet.Packet, error) {
 	}
 
 	for c.size <= c.buf.Len() {
-		p := &packet.Packet{Type: packet.Type(c.typ), Length: c.size, Data: c.buf.Next(c.size)}
+		p := &packet.Packet{Type: packet.Type(c.typ), Length: c.size, Data: c.buf.Next(c.size), Context: context.Background()}
 		packets = append(packets, p)
 
 		// more packet
@@ -118,7 +119,7 @@ func Encode(typ packet.Type, data []byte) ([]byte, error) {
 		return nil, packet.ErrWrongPacketType
 	}
 
-	p := &packet.Packet{Type: typ, Length: len(data)}
+	p := &packet.Packet{Type: typ, Length: len(data), Context: context.Background()}
 	buf := make([]byte, p.Length+HeadLength)
 	buf[0] = byte(p.Type)
 

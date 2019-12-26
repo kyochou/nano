@@ -13,3 +13,9 @@ func WithPipeline(pipeline Pipeline) Option {
 		opt.pipeline = pipeline
 	}
 }
+
+var jaegerAgentAddr string
+
+func SetJaegerAgentAddr(addr string) {
+	jaegerAgentAddr = addr
+}
