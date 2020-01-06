@@ -32,5 +32,6 @@ type key int
 
 const (
 	_ key = iota
+	CTXNanoSpan
 	CTXJaegerSpan
 )

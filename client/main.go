@@ -5,6 +5,7 @@ import (
 	"encoding/binary"
 	"encoding/json"
 	"fmt"
+	"io"
 	"log"
 	"net"
 	"sync"
@@ -17,7 +18,10 @@ import (
 	"github.com/lonng/nano/internal/packet"
 	"github.com/lonng/nano/tracing"
 	opentracing "github.com/opentracing/opentracing-go"
+	"github.com/rcrowley/go-metrics"
 )
+
+var _metrics SmStrHistogram
 
 var (
 	hsd []byte // handshake data
@@ -70,8 +74,26 @@ type (
 		connectedCallback func() // connected callback
 		opentraces        tracing.SmStrSpan
 		Name              string
+		Tracer            opentracing.Tracer
+		Timers            SmStrTimer
 	}
 )
+
+func WriteMetrics(out io.Writer) {
+	fmt.Fprintf(out, "\n\n\n-----------%s-----------\n", `metrics`)
+	_metrics.Range(func(key string, value *metrics.Histogram) bool {
+		h := *value
+		fmt.Fprintf(out, "%s\n", ``)
+		fmt.Fprintf(out, "%s\n", key)
+		fmt.Fprintf(out, "\ttotal: %d\n", h.Count())
+		fmt.Fprintf(out, "\tmean : %.2fms\n", float64(h.Mean())/float64(time.Millisecond))
+		fmt.Fprintf(out, "\tmax  : %.2fms\n", float64(h.Max())/float64(time.Millisecond))
+		fmt.Fprintf(out, "\tmin  : %.2fms\n", float64(h.Min())/float64(time.Millisecond))
+		fmt.Fprintf(out, "%s\n", ``)
+		return true
+	})
+	fmt.Fprintf(out, "-----------%s-----------\n", `-------`)
+}
 
 // NewConnector create a new Connector
 func NewConnector() *Connector {
@@ -83,6 +105,10 @@ func NewConnector() *Connector {
 		events:    map[string]Callback{},
 		responses: map[uint]Callback{},
 	}
+}
+
+func metricsName(startRoute, endRoute string) string {
+	return startRoute + ` => ` + endRoute
 }
 
 // Start connect to the server and send/recv between the c/s
@@ -165,12 +191,21 @@ func (c *Connector) Notify(route string, v proto.Message) error {
 }
 
 func (c *Connector) TraceNotify(route string, v proto.Message, finishRoute string) error {
+	c.Timers.Store(finishRoute, &Timer{
+		ReqAt:    time.Now(),
+		ReqRoute: route,
+	})
+	mh := metrics.NewHistogram(metrics.NewUniformSample(10240))
+	_metrics.LoadOrStore(metricsName(route, finishRoute), &mh)
+	if c.Tracer == nil {
+		return c.Notify(route, v)
+	}
 	msg, err := c.getNotifyMessage(route, v)
 	if err != nil {
 		return err
 	}
 
-	span := opentracing.GlobalTracer().StartSpan(fmt.Sprintf("%s => %s", route, finishRoute))
+	span := c.Tracer.StartSpan(fmt.Sprintf("%s => %s", route, finishRoute))
 	span.SetTag(`req-route`, route)
 	span.SetTag(`req-content`, v)
 	c.opentraces.Store(finishRoute, span)
@@ -349,6 +384,14 @@ func (c *Connector) processMessage(msg *message.Message) {
 		// log.Printf("on %v", msg)
 		if opspan, ok := c.opentraces.Load(msg.Route); ok {
 			opspan.Finish()
+		}
+
+		if t, ok := c.Timers.Load(msg.Route); ok {
+			if hm, ok := _metrics.Load(metricsName(t.ReqRoute, msg.Route)); ok {
+				c.Timers.Delete(msg.Route)
+				rhm := *hm
+				rhm.Update(int64(time.Since(t.ReqAt)))
+			}
 		}
 		cb(msg.Data)
 

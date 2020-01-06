@@ -163,7 +163,17 @@ func (h *handlerService) dispatch() {
 		select {
 		case m := <-h.chLocalProcess: // logic dispatch
 			m.agent.lastMid = m.lastMid
+			var span opentracing.Span
+			if ctx, ok := m.args[1].Interface().(context.Context); ok {
+				if sctx, sok := ctx.Value(CTXNanoSpan).(opentracing.SpanContext); sok {
+					span = opentracing.GlobalTracer().StartSpan(`func `+m.handler.Name, opentracing.ChildOf(sctx))
+					m.args[1] = reflect.ValueOf(context.WithValue(ctx, CTXJaegerSpan, span.Context()))
+				}
+			}
 			pcall(m.handler, m.args)
+			if span != nil {
+				span.Finish()
+			}
 
 		case s := <-h.chCloseSession: // session closed callback
 			onSessionClosed(s)
@@ -303,7 +313,7 @@ func (h *handlerService) processPacket(agent *agent, p *packet.Packet) error {
 		smSpan, _ := agent.session.Value(session.SKOpenTraces).(*tracing.SmStrSpan)
 		smSpan.LoadOrStore(rtn, child)
 
-		p.Context = context.WithValue(p.Context, CTXJaegerSpan, child.Context())
+		p.Context = context.WithValue(p.Context, CTXNanoSpan, child.Context())
 		p.Data = data[68+tdl:]
 		p.Type = packet.Data
 		h.processPacket(agent, p)
