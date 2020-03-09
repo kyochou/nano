@@ -38,6 +38,7 @@ type NetworkEntity interface {
 	ResponseMID(mid uint, v interface{}) error
 	Close() error
 	RemoteAddr() net.Addr
+	ClientIP() string
 }
 
 var (
@@ -122,6 +123,11 @@ func (s *Session) Close() {
 // RemoteAddr returns the remote network address.
 func (s *Session) RemoteAddr() net.Addr {
 	return s.entity.RemoteAddr()
+}
+
+// ClientIP returns the remote network ip.
+func (s *Session) ClientIP() string {
+	return s.entity.ClientIP()
 }
 
 // Remove delete data associated with the key from session storage

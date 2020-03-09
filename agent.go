@@ -51,15 +51,16 @@ type (
 	// Agent corresponding a user, used for store raw conn information
 	agent struct {
 		// regular agent member
-		session *session.Session    // session
-		conn    net.Conn            // low-level conn fd
-		lastMid uint                // last message id
-		state   int32               // current agent state
-		chDie   chan struct{}       // wait for close
-		chSend  chan pendingMessage // push message queue
-		lastAt  int64               // last heartbeat unix time stamp
-		decoder *codec.Decoder      // binary decoder
-		options *options
+		session  *session.Session // session
+		conn     net.Conn         // low-level conn fd
+		clientIP string
+		lastMid  uint                // last message id
+		state    int32               // current agent state
+		chDie    chan struct{}       // wait for close
+		chSend   chan pendingMessage // push message queue
+		lastAt   int64               // last heartbeat unix time stamp
+		decoder  *codec.Decoder      // binary decoder
+		options  *options
 
 		srv reflect.Value // cached session reflect.Value
 	}
@@ -73,15 +74,16 @@ type (
 )
 
 // Create new agent instance
-func newAgent(conn net.Conn, options *options) *agent {
+func newAgent(conn net.Conn, cip string, options *options) *agent {
 	a := &agent{
-		conn:    conn,
-		state:   statusStart,
-		chDie:   make(chan struct{}),
-		lastAt:  time.Now().Unix(),
-		chSend:  make(chan pendingMessage, agentWriteBacklog),
-		decoder: codec.NewDecoder(),
-		options: options,
+		conn:     conn,
+		clientIP: cip,
+		state:    statusStart,
+		chDie:    make(chan struct{}),
+		lastAt:   time.Now().Unix(),
+		chSend:   make(chan pendingMessage, agentWriteBacklog),
+		decoder:  codec.NewDecoder(),
+		options:  options,
 	}
 
 	// binding session
@@ -212,6 +214,10 @@ func (a *agent) Close() error {
 // returns the remote network address.
 func (a *agent) RemoteAddr() net.Addr {
 	return a.conn.RemoteAddr()
+}
+
+func (a *agent) ClientIP() string {
+	return a.clientIP
 }
 
 // String, implementation for Stringer interface

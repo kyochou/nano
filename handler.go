@@ -210,9 +210,9 @@ func (h *handlerService) register(comp component.Component, opts []component.Opt
 	return nil
 }
 
-func (h *handlerService) handle(conn net.Conn) {
+func (h *handlerService) handle(conn net.Conn, cip string) {
 	// create a client agent and startup write gorontine
-	agent := newAgent(conn, h.options)
+	agent := newAgent(conn, cip, h.options)
 
 	// startup write goroutine
 	go agent.write()

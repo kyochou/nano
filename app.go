@@ -122,8 +122,8 @@ func listenAndServe(addr string) {
 			logger.Println(err.Error())
 			continue
 		}
-
-		go handler.handle(conn)
+		addr := conn.RemoteAddr().(*net.TCPAddr)
+		go handler.handle(conn, addr.IP.String())
 	}
 }
 
@@ -141,7 +141,7 @@ func listenAndServeWS(addr string) {
 			return
 		}
 
-		handler.handleWS(conn)
+		handler.handleWS(conn, clientIP(r, conn))
 	})
 
 	if err := http.ListenAndServe(addr, nil); err != nil {
@@ -162,11 +162,25 @@ func listenAndServeWSTLS(addr string, certificate string, key string) {
 			logger.Println(fmt.Sprintf("Upgrade failure, URI=%s, Error=%s", r.RequestURI, err.Error()))
 			return
 		}
+		handler.handleWS(conn, clientIP(r, conn))
 
-		handler.handleWS(conn)
 	})
 
 	if err := http.ListenAndServeTLS(addr, certificate, key, nil); err != nil {
 		logger.Fatal(err.Error())
 	}
+}
+
+func clientIP(r *http.Request, conn *websocket.Conn) string {
+	clientIP := r.Header.Get(`X-Forwarded-For`)
+	clientIP = strings.TrimSpace(strings.Split(clientIP, `,`)[0])
+	if clientIP == `` {
+		clientIP = strings.TrimSpace(r.Header.Get(`X-Real-IP`))
+	}
+	if clientIP == `` {
+		addr := conn.RemoteAddr().(*net.TCPAddr)
+		clientIP = addr.IP.String()
+	}
+
+	return clientIP
 }
