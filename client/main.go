@@ -3,6 +3,7 @@ package client
 import (
 	"bytes"
 	"encoding/binary"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -333,6 +334,27 @@ func (c *Connector) read() {
 			c.processPacket(p)
 		}
 	}
+}
+
+// Parse hexstr to message bytes
+func (c *Connector) Parse(hexstr string) ([]byte, error) {
+	bytes, err := hex.DecodeString(hexstr)
+	if err != nil {
+		return nil, err
+	}
+
+	pkt, err := c.codec.Decode(bytes)
+	if err != nil {
+		panic(err)
+	}
+	fmt.Printf("Packet: %#v\n", pkt[0])
+	msg, err := message.Decode(pkt[0].Data)
+	if err != nil {
+		return nil, err
+	}
+	fmt.Printf("Message: %#v\n", msg)
+
+	return msg.Data, nil
 }
 
 func (c *Connector) processPacket(p *packet.Packet) {
