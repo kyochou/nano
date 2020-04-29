@@ -95,12 +95,12 @@ func listenTLS(addr string, isWs bool, certificate string, key string, opts ...O
 	// stop server
 	select {
 	case <-env.die:
-		logger.Println("The app will shutdown in a few seconds")
+		logger.Fatal("The app will shutdown in a few seconds")
 	case s := <-sg:
-		logger.Println("got signal", s)
+		logger.Fatal("got signal", s)
 	}
 
-	logger.Println("server is stopping...")
+	logger.Fatal("server is stopping...")
 
 	// shutdown all components registered by application, that
 	// call by reverse order against register
@@ -146,6 +146,7 @@ func listenAndServeWS(addr string) {
 
 	if err := http.ListenAndServe(addr, nil); err != nil {
 		logger.Fatal(err.Error())
+		os.Exit(1)
 	}
 }
 
