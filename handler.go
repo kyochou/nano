@@ -110,7 +110,10 @@ func pcall(method reflect.Method, args []reflect.Value) {
 	defer func() {
 		if err := recover(); err != nil {
 			logger.Println(fmt.Sprintf("nano/dispatch: %v", err))
-			println(stack())
+			errMsg, ok := err.(error)
+			if !ok || errMsg.Error() != `非法调用` {
+				println(stack())
+			}
 		}
 	}()
 
