@@ -138,7 +138,7 @@ func (c *Group) Broadcast(route string, v interface{}) error {
 			if err != nil {
 				// ignore error
 				// logger.Println(fmt.Sprintf("Session push message error, ID=%d, UID=%d, Error=%s", s.ID(), s.UID(), err.Error()))
-			} else {
+			} else if _, ok := env.debugIgnoreRoutes[route]; !ok {
 				logger.Println(fmt.Sprintf("Session push ID=%d, UID=%d, Route=%s, Data=%+v", s.ID(), s.UID(), route, v))
 			}
 		}
